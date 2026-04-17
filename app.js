@@ -1,7 +1,26 @@
 const STORAGE_KEY = 'juri-audiencias';
-const state = { hearings: [], alertIds: new Set(), activeFiles: {}, currentMonth: new Date(), selectedDate: new Date() };
+const USERS_KEY = 'juri-users';
+const CURRENT_USER_KEY = 'juri-current-user';
+const state = {
+  hearings: [],
+  alertIds: new Set(),
+  activeFiles: {},
+  currentMonth: new Date(),
+  selectedDate: new Date(),
+  user: null,
+  authMode: 'login'
+};
 
 const elements = {
+  authScreen: document.getElementById('authScreen'),
+  authForm: document.getElementById('authForm'),
+  authTabs: document.querySelectorAll('.auth-tab'),
+  authNameField: document.querySelector('.auth-name-field'),
+  authEmail: document.getElementById('authEmail'),
+  authPassword: document.getElementById('authPassword'),
+  authName: document.getElementById('authName'),
+  authSubmit: document.getElementById('authSubmit'),
+  authHelp: document.getElementById('authHelp'),
   agendaTab: document.getElementById('agendaTab'),
   historyTab: document.getElementById('historyTab'),
   modal: document.getElementById('modal'),
@@ -27,12 +46,51 @@ const elements = {
   closePreview: document.getElementById('closePreview'),
   printBtn: document.getElementById('printBtn'),
   closePrintPreview: document.getElementById('closePrintPreview'),
+  userBadge: document.getElementById('userBadge'),
+  logoutBtn: document.getElementById('logoutBtn'),
+  appShell: document.querySelector('.app-shell'),
   tabs: document.querySelectorAll('.tab')
 };
 
+function loadUsers() {
+  try {
+    const serialized = localStorage.getItem(USERS_KEY);
+    return serialized ? JSON.parse(serialized) : [];
+  } catch (error) {
+    return [];
+  }
+}
+
+function saveUsers(users) {
+  localStorage.setItem(USERS_KEY, JSON.stringify(users));
+}
+
+function getCurrentUser() {
+  try {
+    const serialized = localStorage.getItem(CURRENT_USER_KEY);
+    return serialized ? JSON.parse(serialized) : null;
+  } catch (error) {
+    return null;
+  }
+}
+
+function setCurrentUser(user) {
+  state.user = user;
+  localStorage.setItem(CURRENT_USER_KEY, JSON.stringify(user));
+}
+
+function clearCurrentUser() {
+  state.user = null;
+  localStorage.removeItem(CURRENT_USER_KEY);
+}
+
+function getDataStorageKey() {
+  return state.user ? `${STORAGE_KEY}-${state.user.email}` : STORAGE_KEY;
+}
+
 function loadData() {
   try {
-    const serialized = localStorage.getItem(STORAGE_KEY);
+    const serialized = localStorage.getItem(getDataStorageKey());
     state.hearings = serialized ? JSON.parse(serialized) : [];
   } catch (error) {
     state.hearings = [];
@@ -40,8 +98,103 @@ function loadData() {
 }
 
 function saveData() {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(state.hearings));
+  localStorage.setItem(getDataStorageKey(), JSON.stringify(state.hearings));
   render();
+}
+
+function showApp() {
+  elements.authScreen.classList.add('hidden');
+  elements.appShell.classList.remove('hidden');
+  elements.logoutBtn.classList.toggle('hidden', !state.user);
+  elements.userBadge.textContent = state.user ? `Olá, ${state.user.name}` : '';
+  render();
+  evaluateAlerts();
+}
+
+function showAuthScreen() {
+  elements.authScreen.classList.remove('hidden');
+  elements.appShell.classList.add('hidden');
+  elements.logoutBtn.classList.add('hidden');
+  elements.userBadge.textContent = '';
+  elements.authEmail.focus();
+}
+
+function updateAuthForm() {
+  const isRegister = state.authMode === 'register';
+  elements.authNameField.classList.toggle('hidden', !isRegister);
+  elements.authSubmit.textContent = isRegister ? 'Cadastrar' : 'Entrar';
+  elements.authHelp.textContent = isRegister
+    ? 'Já tem conta? Clique em Entrar.'
+    : 'Ainda não tem conta? Faça seu cadastro.';
+}
+
+function changeAuthMode(mode) {
+  state.authMode = mode;
+  elements.authTabs.forEach(tab => tab.classList.toggle('active', tab.dataset.auth === mode));
+  updateAuthForm();
+}
+
+function signIn(email, password) {
+  const users = loadUsers();
+  const user = users.find(item => item.email === email && item.password === password);
+  if (!user) {
+    alert('Email ou senha inválidos.');
+    return false;
+  }
+  setCurrentUser({ name: user.name, email: user.email });
+  loadData();
+  showApp();
+  return true;
+}
+
+function signUp(name, email, password) {
+  const users = loadUsers();
+  if (users.some(item => item.email === email)) {
+    alert('Já existe uma conta com este email.');
+    return false;
+  }
+  const newUser = { name, email, password };
+  users.push(newUser);
+  saveUsers(users);
+  setCurrentUser({ name: newUser.name, email: newUser.email });
+  loadData();
+  showApp();
+  return true;
+}
+
+function handleAuthSubmit(event) {
+  event.preventDefault();
+  const email = elements.authEmail.value.trim().toLowerCase();
+  const password = elements.authPassword.value.trim();
+  const name = elements.authName.value.trim();
+
+  if (!email || !password || (state.authMode === 'register' && !name)) {
+    alert('Preencha todos os campos do formulário.');
+    return;
+  }
+
+  if (state.authMode === 'register') {
+    signUp(name, email, password);
+  } else {
+    signIn(email, password);
+  }
+}
+
+function logout() {
+  clearCurrentUser();
+  state.hearings = [];
+  showAuthScreen();
+}
+
+function initAuth() {
+  const currentUser = getCurrentUser();
+  if (currentUser) {
+    state.user = currentUser;
+    loadData();
+    showApp();
+  } else {
+    showAuthScreen();
+  }
 }
 
 function formatDate(dateString) {
@@ -422,6 +575,13 @@ elements.agendaTab.addEventListener('click', event => {
 });
 elements.historyTab.addEventListener('click', onDocumentLinkClick);
 
+elements.authTabs.forEach(tab => {
+  tab.addEventListener('click', () => changeAuthMode(tab.dataset.auth));
+});
+
+elements.authForm.addEventListener('submit', handleAuthSubmit);
+elements.logoutBtn.addEventListener('click', logout);
+
 elements.tabs.forEach(tab => {
   tab.addEventListener('click', () => {
     elements.tabs.forEach(button => button.classList.toggle('active', button === tab));
@@ -441,10 +601,10 @@ document.addEventListener('keydown', event => {
   }
 });
 
-loadData();
-render();
-evaluateAlerts();
+initAuth();
 setInterval(() => {
-  render();
-  evaluateAlerts();
+  if (state.user) {
+    render();
+    evaluateAlerts();
+  }
 }, 60000);
