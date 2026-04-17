@@ -7,13 +7,45 @@
   <link rel="stylesheet" href="style.css" />
 </head>
 <body>
-  <div class="app-shell">
+  <div id="authScreen" class="auth-screen">
+    <div class="auth-card">
+      <div class="auth-brand">
+        <h1>Agenda Jurídica</h1>
+        <p>Dr. Silva & Associados</p>
+      </div>
+      <div class="auth-tabs">
+        <button type="button" class="auth-tab active" data-auth="login">Entrar</button>
+        <button type="button" class="auth-tab" data-auth="register">Cadastrar</button>
+      </div>
+      <form id="authForm" novalidate>
+        <div class="auth-fields">
+          <label class="auth-label">Email
+            <input type="email" id="authEmail" placeholder="seu@dominio.com" required />
+          </label>
+          <label class="auth-label">Senha
+            <input type="password" id="authPassword" placeholder="••••••••" required />
+          </label>
+          <label class="auth-label auth-name-field hidden">Nome
+            <input type="text" id="authName" placeholder="Seu nome completo" />
+          </label>
+        </div>
+        <button type="submit" id="authSubmit" class="auth-submit">Entrar</button>
+        <p class="auth-help" id="authHelp">Ainda não tem conta? Faça seu cadastro.</p>
+      </form>
+    </div>
+  </div>
+
+  <div class="app-shell hidden">
     <header class="topbar">
       <div>
         <h1>Agenda Jurídica</h1>
         <p>Dr. Silva & Associados</p>
       </div>
       <div class="header-actions">
+        <div class="user-panel">
+          <span id="userBadge"></span>
+          <button id="logoutBtn" class="logout-btn hidden">Sair</button>
+        </div>
         <button id="newHearingBtn">+ Nova audiência</button>
         <button id="exportBtn">↓ Exportar PDF</button>
       </div>
