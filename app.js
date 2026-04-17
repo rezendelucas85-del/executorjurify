@@ -1,5 +1,5 @@
 const STORAGE_KEY = 'juri-audiencias';
-const state = { hearings: [], alertIds: new Set(), activeFiles: {} };
+const state = { hearings: [], alertIds: new Set(), activeFiles: {}, currentMonth: new Date(), selectedDate: new Date() };
 
 const elements = {
   agendaTab: document.getElementById('agendaTab'),
@@ -17,6 +17,7 @@ const elements = {
   time: document.getElementById('time'),
   vara: document.getElementById('vara'),
   type: document.getElementById('type'),
+  category: document.getElementById('category'),
   judge: document.getElementById('judge'),
   process: document.getElementById('process'),
   notes: document.getElementById('notes'),
@@ -65,17 +66,142 @@ function getStatus(hearing) {
   return hearing.status === 'confirmado' ? 'confirmado' : 'pendente';
 }
 
+function isSameDay(dateA, dateB) {
+  return dateA.getFullYear() === dateB.getFullYear() && dateA.getMonth() === dateB.getMonth() && dateA.getDate() === dateB.getDate();
+}
+
+function getCategoryClass(category) {
+  const key = String(category || 'Cível').toLowerCase();
+  if (key.includes('criminal')) return 'criminal';
+  if (key.includes('trabalhista')) return 'trabalhista';
+  if (key.includes('família') || key.includes('familia')) return 'familia';
+  return 'civel';
+}
+
+function formatDateValue(date) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
+function getMonthLabel(date) {
+  return date.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' });
+}
+
+function setCurrentMonth(delta) {
+  const next = new Date(state.currentMonth);
+  next.setMonth(next.getMonth() + delta);
+  state.currentMonth = next;
+  render();
+}
+
+function getHearingsForDate(date) {
+  return sortHearings(state.hearings).filter(item => isSameDay(new Date(`${item.date}T${item.time}`), date));
+}
+
+function renderCalendar() {
+  const monthStart = new Date(state.currentMonth);
+  monthStart.setDate(1);
+  monthStart.setHours(0, 0, 0, 0);
+  const year = monthStart.getFullYear();
+  const month = monthStart.getMonth();
+  const firstWeekDay = monthStart.getDay();
+  const totalDays = new Date(year, month + 1, 0).getDate();
+  const today = state.selectedDate || new Date();
+
+  const weekdays = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'].map(day => `<div class="calendar-weekday">${day}</div>`).join('');
+  const cells = [];
+
+  for (let index = 0; index < 42; index += 1) {
+    const currentDay = new Date(year, month, index - firstWeekDay + 1);
+    const sameMonth = currentDay.getMonth() === month;
+    const dateValue = formatDateValue(currentDay);
+    const events = getHearingsForDate(currentDay);
+    const dots = events.map(item => `<span class="day-dot category-${getCategoryClass(item.category || item.type)}" title="${item.category || item.type}"></span>`).slice(0, 3).join('');
+    const classes = ['calendar-day'];
+    if (!sameMonth) classes.push('inactive');
+    if (isSameDay(currentDay, today)) classes.push('selected');
+
+    cells.push(`
+      <button type="button" class="${classes.join(' ')}" data-date="${dateValue}" ${sameMonth ? '' : 'disabled'}>
+        <span class="calendar-day-number">${currentDay.getDate()}</span>
+        <div class="day-dots">${dots}</div>
+      </button>
+    `);
+  }
+
+  return `
+    <div class="calendar-header">
+      <div>
+        <h2>${getMonthLabel(monthStart)}</h2>
+        <div class="calendar-legend">
+          <span class="legend-item"><span class="legend-color category-civel"></span>Cível</span>
+          <span class="legend-item"><span class="legend-color category-criminal"></span>Criminal</span>
+          <span class="legend-item"><span class="legend-color category-trabalhista"></span>Trabalhista</span>
+          <span class="legend-item"><span class="legend-color category-familia"></span>Família</span>
+        </div>
+      </div>
+      <div class="calendar-nav">
+        <button type="button" data-action="prev-month">‹</button>
+        <button type="button" data-action="next-month">›</button>
+      </div>
+    </div>
+    <div class="calendar-grid">${weekdays}${cells.join('')}</div>
+  `;
+}
+
+function buildDayCard(hearing) {
+  const status = getStatus(hearing);
+  const categoryClass = getCategoryClass(hearing.category || hearing.type);
+  return `
+    <article class="day-card" data-id="${hearing.id}">
+      <div class="day-card-header">
+        <div>
+          <h3>${formatTime(hearing.time)} — ${hearing.process}</h3>
+          <div class="day-card-meta">
+            <span class="day-card-time">${hearing.vara}</span>
+            <span class="category-pill category-${categoryClass}">${hearing.category || hearing.type}</span>
+          </div>
+        </div>
+        <span class="day-card-status status-${status}">${status === 'pendente' ? 'Pendente' : 'Confirmado'}</span>
+      </div>
+      <div class="day-card-meta">
+        <span>Juiz(a): ${hearing.judge}</span>
+        <span>${hearing.documents.length} documento${hearing.documents.length === 1 ? '' : 's'}</span>
+      </div>
+      <div class="day-card-actions">
+        ${status === 'pendente' ? `<button class="checkin-btn" data-action="checkin" data-id="${hearing.id}">Check-in</button>` : ''}
+      </div>
+    </article>
+  `;
+}
+
 function render() {
   renderAgenda();
   renderHistory();
 }
 
 function renderAgenda() {
-  const now = new Date();
-  const pending = sortHearings(state.hearings)
-    .filter(item => item.status === 'pendente' && new Date(`${item.date}T${item.time}`) >= now);
+  const selectedDate = state.selectedDate || new Date();
+  const dayLabel = selectedDate.toLocaleDateString('pt-BR', { weekday: 'long', day: '2-digit', month: 'long', year: 'numeric' });
+  const dayHearings = getHearingsForDate(selectedDate);
+  const dayItems = dayHearings.length ? dayHearings.map(buildDayCard).join('') : '<div class="no-data"><strong>Nenhuma audiência para esta data.</strong><p>Selecione um dia no calendário ou cadastre uma nova audiência.</p></div>';
 
-  elements.agendaTab.innerHTML = pending.length ? pending.map(buildCard).join('') : '<div class="no-data"><strong>Nenhuma audiência pendente.</strong><p>Cadastre uma nova audiência para começar a acompanhar os status e alertas.</p></div>';
+  elements.agendaTab.innerHTML = `
+    <div class="agenda-panel">
+      <section class="calendar-panel">
+        ${renderCalendar()}
+      </section>
+      <section class="day-list">
+        <article class="day-summary">
+          <h2>${dayLabel}</h2>
+          <p>${dayHearings.length} audiência${dayHearings.length === 1 ? '' : 's'} agendada</p>
+          <div class="day-items">${dayItems}</div>
+        </article>
+      </section>
+    </div>
+  `;
 }
 
 function renderHistory() {
@@ -93,6 +219,7 @@ function buildCard(hearing) {
     <div class="doc-item"><span>${doc.name}</span><a href="#" data-id="${hearing.id}" data-doc="${index}">Abrir</a></div>
   `).join('') : '<p style="color: var(--muted);">Nenhum documento anexado.</p>';
 
+  const categoryClass = getCategoryClass(hearing.category || hearing.type);
   return `
     <article class="hearing-card" data-id="${hearing.id}">
       <div class="card-head">
@@ -102,6 +229,7 @@ function buildCard(hearing) {
             <span class="status-pill status-${status}">${status === 'pendente' ? 'Pendente' : 'Confirmado'}</span>
           </div>
           <strong>${hearing.vara} • ${hearing.type}</strong>
+          <span class="category-pill category-${categoryClass}">${hearing.category || hearing.type}</span>
         </div>
         <span class="badge">${hearing.process}</span>
       </div>
@@ -153,6 +281,7 @@ function handleFormSubmit(event) {
     time: elements.time.value,
     vara: elements.vara.value.trim(),
     type: elements.type.value,
+    category: elements.category.value,
     judge: elements.judge.value.trim(),
     process: elements.process.value.trim(),
     notes: elements.notes.value.trim(),
@@ -161,7 +290,7 @@ function handleFormSubmit(event) {
     documents: []
   };
 
-  if (!hearing.date || !hearing.time || !hearing.vara || !hearing.type || !hearing.judge || !hearing.process) {
+  if (!hearing.date || !hearing.time || !hearing.vara || !hearing.type || !hearing.category || !hearing.judge || !hearing.process) {
     alert('Por favor, preencha todos os campos obrigatórios.');
     return;
   }
@@ -225,10 +354,11 @@ function openPreview() {
     return `
       <section class="preview-item">
         <div class="preview-item-header">
-          <h3>${item.vara} – ${item.type}</h3>
+          <h3>${item.vara} – ${item.category || item.type}</h3>
           <span class="preview-status ${status}">${status === 'pendente' ? 'Pendente' : 'Confirmado'}</span>
         </div>
         <p><strong>Data:</strong> ${dateTime}</p>
+        <p><strong>Categoria:</strong> ${item.category || item.type}</p>
         <p><strong>Juiz(a):</strong> ${item.judge}</p>
         <p><strong>Processo:</strong> ${item.process}</p>
         <p><strong>Orientações:</strong> ${item.notes || 'Nenhuma'}</p>
@@ -269,9 +399,25 @@ elements.printBtn.addEventListener('click', () => window.print());
 elements.documents.addEventListener('change', resetFilePreview);
 elements.hearingForm.addEventListener('submit', handleFormSubmit);
 elements.agendaTab.addEventListener('click', event => {
-  if (event.target.dataset.action === 'checkin') {
-    handleCheckIn(event.target.dataset.id);
+  const checkinButton = event.target.closest('[data-action="checkin"]');
+  if (checkinButton) {
+    handleCheckIn(checkinButton.dataset.id);
+    return;
   }
+
+  const navButton = event.target.closest('[data-action="prev-month"], [data-action="next-month"]');
+  if (navButton) {
+    setCurrentMonth(navButton.dataset.action === 'next-month' ? 1 : -1);
+    return;
+  }
+
+  const dayButton = event.target.closest('.calendar-day');
+  if (dayButton && !dayButton.disabled) {
+    state.selectedDate = new Date(dayButton.dataset.date);
+    render();
+    return;
+  }
+
   onDocumentLinkClick(event);
 });
 elements.historyTab.addEventListener('click', onDocumentLinkClick);
