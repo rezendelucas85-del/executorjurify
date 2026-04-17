@@ -34,6 +34,54 @@ button { cursor: pointer; }
 .alert-bar { display: flex; align-items: center; gap: 12px; background: #fef2f2; color: var(--danger); border: 1px solid #fecaca; border-radius: 16px; padding: 14px 18px; margin-bottom: 18px; }
 .alert-bar.hidden { display: none; }
 
+.agenda-panel { display: grid; gap: 24px; }
+.calendar-panel { background: var(--card); border-radius: 24px; padding: 24px; box-shadow: var(--shadow); border: 1px solid rgba(226,232,240,0.9); }
+.calendar-header { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-bottom: 18px; }
+.calendar-header h2 { margin: 0; font-size: 1.05rem; }
+.calendar-nav { display: flex; gap: 10px; align-items: center; }
+.calendar-nav button { border: 1px solid var(--border); border-radius: 999px; background: #fff; padding: 10px 14px; color: var(--text); }
+.calendar-month { font-weight: 700; }
+.calendar-legend { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-top: 10px; }
+.legend-item { display: inline-flex; align-items: center; gap: 8px; font-size: 0.88rem; color: var(--muted); }
+.legend-color { width: 10px; height: 10px; border-radius: 999px; display: inline-block; }
+
+.calendar-grid { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 10px; margin-top: 20px; }
+.calendar-weekday { text-align: center; padding: 10px 0; font-size: 0.8rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.08em; }
+.calendar-day { min-height: 98px; padding: 12px; border-radius: 18px; background: #f8fafc; border: 1px solid transparent; display: flex; flex-direction: column; justify-content: space-between; cursor: pointer; transition: border 0.15s ease, background 0.15s ease; }
+.calendar-day:hover { border-color: rgba(59,130,246,0.25); }
+.calendar-day.selected { background: #eff6ff; border-color: var(--primary); }
+.calendar-day.inactive { color: #9ca3af; background: transparent; cursor: default; }
+.calendar-day-number { font-weight: 700; }
+.day-dots { display: flex; gap: 4px; flex-wrap: wrap; margin-top: 10px; }
+.day-dot { width: 8px; height: 8px; border-radius: 50%; }
+
+.day-list { display: grid; gap: 16px; }
+.day-summary { background: var(--card); border-radius: 24px; padding: 24px; box-shadow: var(--shadow); border: 1px solid rgba(226,232,240,0.9); }
+.day-summary h2 { margin: 0 0 10px; }
+.day-items { display: grid; gap: 16px; margin-top: 16px; }
+.day-card { display: grid; gap: 14px; padding: 20px; border-radius: 22px; background: #fff; border: 1px solid rgba(226,232,240,0.9); box-shadow: 0 10px 28px rgba(15,23,42,0.06); }
+.day-card-header { display: flex; justify-content: space-between; gap: 12px; align-items: flex-start; }
+.day-card-header h3 { margin: 0; font-size: 1rem; }
+.day-card-meta { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+.day-card-meta span { display: inline-flex; align-items: center; gap: 8px; font-size: 0.85rem; }
+.day-card-time { font-weight: 700; }
+.category-pill { border-radius: 999px; padding: 6px 12px; font-size: 0.78rem; font-weight: 700; color: #fff; }
+.category-civel { background: #4338ca; }
+.category-criminal { background: #b91c1c; }
+.category-trabalhista { background: #b45309; }
+.category-familia { background: #0f766e; }
+.day-card-status { border-radius: 999px; padding: 6px 14px; font-size: 0.81rem; font-weight: 700; }
+.status-pendente { background: #fee2e2; color: var(--danger); }
+.status-confirmado { background: #dcfce7; color: var(--success); }
+.day-card-actions { display: flex; gap: 10px; flex-wrap: wrap; justify-content: flex-end; }
+.day-card-actions button { border: none; border-radius: 999px; padding: 10px 16px; font-weight: 700; }
+.checkin-btn { background: var(--success); color: #fff; }
+.view-btn { background: #e2e8f0; color: var(--text); }
+
+@media (min-width: 1024px) {
+  .agenda-panel { grid-template-columns: 1.3fr 1fr; }
+}
+
 .tab-panel { display: none; gap: 18px; }
 .tab-panel.active { display: grid; }
 .no-data { background: var(--card); border: 1px dashed var(--border); border-radius: 18px; padding: 40px; text-align: center; color: var(--muted); }
