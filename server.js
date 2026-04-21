@@ -2,6 +2,7 @@ const express = require('express');
 const sqlite3 = require('sqlite3').verbose();
 const cors = require('cors');
 const bodyParser = require('body-parser');
+const bcrypt = require('bcrypt');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -46,24 +47,34 @@ function createTables() {
 }
 
 // Routes
-app.post('/api/register', (req, res) => {
+app.post('/api/register', async (req, res) => {
   const { name, email, password } = req.body;
-  db.run('INSERT INTO users (name, email, password) VALUES (?, ?, ?)', [name, email, password], function(err) {
-    if (err) {
-      return res.status(400).json({ error: 'User already exists or invalid data' });
-    }
-    res.json({ id: this.lastID, name, email });
-  });
+  try {
+    const hashedPassword = await bcrypt.hash(password, 10);
+    db.run('INSERT INTO users (name, email, password) VALUES (?, ?, ?)', [name, email, hashedPassword], function(err) {
+      if (err) {
+        return res.status(400).json({ error: 'User already exists or invalid data' });
+      }
+      res.json({ id: this.lastID, name, email });
+    });
+  } catch (error) {
+    res.status(500).json({ error: 'Error hashing password' });
+  }
 });
 
-app.post('/api/login', (req, res) => {
+app.post('/api/login', async (req, res) => {
   const { email, password } = req.body;
-  db.get('SELECT * FROM users WHERE email = ? AND password = ?', [email, password], (err, row) => {
+  db.get('SELECT * FROM users WHERE email = ?', [email], async (err, row) => {
     if (err) {
       return res.status(500).json({ error: 'Database error' });
     }
     if (row) {
-      res.json({ id: row.id, name: row.name, email: row.email });
+      const match = await bcrypt.compare(password, row.password);
+      if (match) {
+        res.json({ id: row.id, name: row.name, email: row.email });
+      } else {
+        res.status(401).json({ error: 'Invalid credentials' });
+      }
     } else {
       res.status(401).json({ error: 'Invalid credentials' });
     }
