@@ -88,10 +88,15 @@ function getDataStorageKey() {
   return state.user ? `${STORAGE_KEY}-${state.user.email}` : STORAGE_KEY;
 }
 
-function loadData() {
+async function loadData() {
+  if (!state.user) return;
   try {
-    const serialized = localStorage.getItem(getDataStorageKey());
-    state.hearings = serialized ? JSON.parse(serialized) : [];
+    const response = await fetch(`/api/hearings/${state.user.id}`);
+    if (response.ok) {
+      state.hearings = await response.json();
+    } else {
+      state.hearings = [];
+    }
   } catch (error) {
     state.hearings = [];
   }
@@ -102,11 +107,12 @@ function saveData() {
   render();
 }
 
-function showApp() {
+async function showApp() {
   elements.authScreen.classList.add('hidden');
   elements.appShell.classList.remove('hidden');
   elements.logoutBtn.classList.toggle('hidden', !state.user);
   elements.userBadge.textContent = state.user ? `Olá, ${state.user.name}` : '';
+  await loadData();
   render();
   evaluateAlerts();
 }
@@ -134,35 +140,53 @@ function changeAuthMode(mode) {
   updateAuthForm();
 }
 
-function signIn(email, password) {
-  const users = loadUsers();
-  const user = users.find(item => item.email === email && item.password === password);
-  if (!user) {
-    alert('Email ou senha inválidos.');
+async function signIn(email, password) {
+  try {
+    const response = await fetch('/api/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, password })
+    });
+    if (response.ok) {
+      const user = await response.json();
+      setCurrentUser(user);
+      await loadData();
+      showApp();
+      return true;
+    } else {
+      alert('Email ou senha inválidos.');
+      return false;
+    }
+  } catch (error) {
+    alert('Erro ao fazer login.');
     return false;
   }
-  setCurrentUser({ name: user.name, email: user.email });
-  loadData();
-  showApp();
-  return true;
 }
 
-function signUp(name, email, password) {
-  const users = loadUsers();
-  if (users.some(item => item.email === email)) {
-    alert('Já existe uma conta com este email.');
+async function signUp(name, email, password) {
+  try {
+    const response = await fetch('/api/register', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name, email, password })
+    });
+    if (response.ok) {
+      const user = await response.json();
+      setCurrentUser(user);
+      state.hearings = [];
+      showApp();
+      return true;
+    } else {
+      alert('Erro ao cadastrar. Email já existe?');
+      return false;
+    }
+  } catch (error) {
+    alert('Erro ao cadastrar.');
     return false;
   }
-  const newUser = { name, email, password };
-  users.push(newUser);
-  saveUsers(users);
-  setCurrentUser({ name: newUser.name, email: newUser.email });
-  loadData();
-  showApp();
-  return true;
 }
 
-function handleAuthSubmit(event) {
+async function handleAuthSubmit(event) {
   event.preventDefault();
   const email = elements.authEmail.value.trim().toLowerCase();
   const password = elements.authPassword.value.trim();
@@ -174,9 +198,9 @@ function handleAuthSubmit(event) {
   }
 
   if (state.authMode === 'register') {
-    signUp(name, email, password);
+    await signUp(name, email, password);
   } else {
-    signIn(email, password);
+    await signIn(email, password);
   }
 }
 
@@ -186,11 +210,11 @@ function logout() {
   showAuthScreen();
 }
 
-function initAuth() {
+async function initAuth() {
   const currentUser = getCurrentUser();
   if (currentUser) {
     state.user = currentUser;
-    loadData();
+    await loadData();
     showApp();
   } else {
     showAuthScreen();
@@ -426,10 +450,10 @@ function resetFilePreview() {
   });
 }
 
-function handleFormSubmit(event) {
+async function handleFormSubmit(event) {
   event.preventDefault();
   const hearing = {
-    id: crypto.randomUUID(),
+    user_id: state.user.id,
     date: elements.date.value,
     time: elements.time.value,
     vara: elements.vara.value.trim(),
@@ -437,10 +461,7 @@ function handleFormSubmit(event) {
     category: elements.category.value,
     judge: elements.judge.value.trim(),
     process: elements.process.value.trim(),
-    notes: elements.notes.value.trim(),
-    status: 'pendente',
-    createdAt: new Date().toISOString(),
-    documents: []
+    notes: elements.notes.value.trim()
   };
 
   if (!hearing.date || !hearing.time || !hearing.vara || !hearing.type || !hearing.category || !hearing.judge || !hearing.process) {
@@ -448,19 +469,38 @@ function handleFormSubmit(event) {
     return;
   }
 
-  const acceptedFiles = Array.from(elements.documents.files).filter(file => /\.(pdf|doc|docx)$/i.test(file.name));
-  hearing.documents = acceptedFiles.map(file => ({ name: file.name, type: file.type || 'application/octet-stream' }));
-  state.hearings.push(hearing);
-  saveData();
-  closeModal();
+  try {
+    const response = await fetch('/api/hearings', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(hearing)
+    });
+    if (response.ok) {
+      await loadData();
+      closeModal();
+    } else {
+      alert('Erro ao salvar audiência.');
+    }
+  } catch (error) {
+    alert('Erro ao salvar audiência.');
+  }
 }
 
-function handleCheckIn(id) {
-  const item = state.hearings.find(record => record.id === id);
-  if (!item) return;
-  item.status = 'confirmado';
-  item.confirmedAt = new Date().toISOString();
-  saveData();
+async function handleCheckIn(id) {
+  try {
+    const response = await fetch(`/api/hearings/${id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ status: 'confirmado' })
+    });
+    if (response.ok) {
+      await loadData();
+    } else {
+      alert('Erro ao confirmar check-in.');
+    }
+  } catch (error) {
+    alert('Erro ao confirmar check-in.');
+  }
 }
 
 function playAlert() {
